@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>火柴人杀猪记</title>
+    <style>
+        canvas {
+            border: 2px solid #000;
+            background: linear-gradient(45deg, #fff 0%, #eee 100%);
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            margin: 20px;
+            background: #444;
+        }
+        .status-bar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game" width="800" height="600"></canvas>
+    <div class="status-bar">
+        <p>火柴人HP: <span id="playerHp">100</span></p >
+        <p>猪怪HP: <span id="pigHp">150</span></p >
+        <p>技能冷却: <span id="skillCooldown"></span></p >
+    </div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// 游戏对象
+const game = {
+    player: {
+        x: 100,
+        y: 400,
+        speed: 5,
+        hp: 100,
+        maxHp: 100,
+        attackPower: 20, // 攻击力
+        isAttacking: false,
+        attackType: 'ranged', // 默认远程攻击
+        cooldown: 0 // 远程攻击冷却时间
+    },
+    pig: {
+        x: 600,
+        y: 380,
+        hp: 150,
+        maxHp: 150,
+        alive: true,
+        attackPower: 15, // 攻击力
+        skillCooldown: { // 技能冷却时间
+            "发情": 10000,
+            "猪屁": 7000,
+            "母猪压顶": 5000
+        },
+        currentSkillCooldown: { // 当前技能冷却时间
+            "发情": 0,
+            "猪屁": 0,
+            "母猪压顶": 0
+        },
+        usingSkill: false,
+        damageReduction: 1 // 减伤系数，默认为1
+    },
+    keys: {},
+    damageTexts: [] // 用于显示伤害数值
+};
+
+// 绘制火柴人
+function drawStickman() {
+    ctx.beginPath();
+    // 头部
+    ctx.arc(game.player.x + 20, game.player.y - 30, 15, 0, Math.PI * 2);
+    // 身体
+    ctx.moveTo(game.player.x + 20, game.player.y - 15);
+    ctx.lineTo(game.player.x + 20, game.player.y + 40);
+    // 腿
+    ctx.moveTo(game.player.x, game.player.y + 40);
+    ctx.lineTo(game.player.x + 40, game.player.y + 40);
+    // 手臂
+    ctx.moveTo(game.player.x + 20, game.player.y - 10);
+    ctx.lineTo(game.player.isAttacking && game.player.attackType === 'melee' ? game.player.x + 60 : game.player.x, 
+               game.player.isAttacking && game.player.attackType === 'melee' ? game.player.y - 20 : game.player.y - 30);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+}
+
+// 绘制猪怪
+function drawPig() {
+    if (!game.pig.alive) return;
+
+    // 身体
+    ctx.fillStyle = '#999';
+    ctx.beginPath();
+    ctx.ellipse(game.pig.x + 40, game.pig.y + 30, 50, 35, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 头部
+    ctx.beginPath();
+    ctx.arc(game.pig.x + 70, game.pig.y + 15, 20, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 鼻子
+    ctx.fillStyle = '#FFB6C1';
+    ctx.beginPath();
+    ctx.arc(game.pig.x + 80, game.pig.y + 15, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 文字
+    ctx.fillStyle = '#000';
+    ctx.font = '16px Microsoft YaHei';
+    ctx.fillText('何氏出品', game.pig.x + 40, game.pig.y - 10);
+}
+
+// 显示伤害数值
+function drawDamageText() {
+    game.damageTexts.forEach((text, index) => {
+        ctx.fillStyle = 'red';
+        ctx.font = '16px Arial';
+        ctx.fillText(text.value, text.x, text.y);
+        text.y -= 1; // 向上移动
+        if (text.y < 0) {
+            game.damageTexts.splice(index, 1); // 移除超出屏幕的文本
+        }
+    });
+}
+
+// 火柴人攻击逻辑
+function performAttack() {
+    if (game.keys.Space) {
+        if (game.player.attackType === 'ranged') {
+            throwPoop();
+        } else {
+            hitWithPlunger();
+        }
+    }
+}
+
+function throwPoop() {
+    if (game.player.cooldown <= 0) {
+        // 实现投掷粑粑的逻辑
+        if (Math.abs(game.player.x - game.pig.x) < 100) {
+            game.pig.hp -= game.player.attackPower;
+            game.damageTexts.push({x: game.pig.x + 20, y: game.pig.y, value: game.player.attackPower});
+        }
+        game.player.cooldown = 100; // 设置冷却时间
+    }
+}
+
+function hitWithPlunger() {
+    if (Math.abs(game.player.x - game.pig.x) < 50) {
+        game.pig.hp -= game.player.attackPower * 1.5; // 近战伤害更高
+        game.damageTexts.push({x: game.pig.x + 20, y: game.pig.y, value: game.player.attackPower * 1.5});
+    }
+}
+
+// 猪的普通攻击
+function pigAttack() {
+    if (Math.abs(game.player.x - game.pig.x) < 50) {
+        game.player.hp -= game.pig.attackPower;
+        game.damageTexts.push({x: game.player.x + 20, y: game.player.y - 30, value: game.pig.attackPower});
+    }
+}
+
+// 猪的技能逻辑
+function useSkills() {
+    if (game.pig.currentSkillCooldown["发情"] <= 0 && Math.random() < 0.1) {
+        game.pig.damageReduction = 0.5;
+        game.pig.hp += 20;
+        if (game.pig.hp > game.pig.maxHp) game.pig.hp = game.pig.maxHp;
+        game.pig.currentSkillCooldown["发情"] = game.pig.skillCooldown["发情"];
+    }
+
+    if (game.pig.currentSkillCooldown["猪屁"] <= 0 && Math.random() < 0.1) {
+        // 毒气伤害
+        game.player.hp -= 10;
+        game.damageTexts.push({x: game.player.x + 20, y: game.player.y - 30, value: 10});
+        game.pig.currentSkillCooldown["猪屁"] = game.pig.skillCooldown["猪屁"];
+    }
+
+    if (game.pig.currentSkillCooldown["母猪压顶"] <= 0 && Math.random() < 0.1) {
+        // 母猪压顶伤害
+        if (Math.abs(game.player.x - game.pig.x) < 100) {
+            game.player.hp -= 30;
+            game.damageTexts.push({x: game.player.x + 20, y: game.player.y - 30, value: 30});
+        }
+        game.pig.currentSkillCooldown["母猪压顶"] = game.pig.skillCooldown["母猪压顶"];
+    }
+}
+
+// 游戏结束处理
+function gameOver() {
+    ctx.fillStyle = '#000';
+    ctx.font = '48px Microsoft YaHei';
+    ctx.fillText('杀猪佬', game.player.x - 30, game.player.y - 100);
+    
+    setTimeout(() => {
+        window.close();
+    }, 3000);
+}
+
+// 更新状态栏
+function updateStatusBar() {
+    document.getElementById('playerHp').innerText = Math.round(game.player.hp);
+    document.getElementById('pigHp').innerText = Math.round(game.pig.hp);
+    let skillCd = '';
+    for (let skill in game.pig.currentSkillCooldown) {
+        if (game.pig.currentSkillCooldown[skill] > 0) {
+            skillCd += `${skill}: ${(game.pig.currentSkillCooldown[skill] / 1000).toFixed(1)}s `;
+        }
+    }
+    document.getElementById('skillCooldown').innerText = skillCd || '无技能冷却';
+}
+
+// 游戏循环
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 玩家移动
+    if (game.keys.ArrowLeft) game.player.x = Math.max(0, game.player.x - game.player.speed);
+    if (game.keys.ArrowRight) game.player.x = Math.min(760, game.player.x + game.player.speed);
+
+    // 玩家攻击
+    performAttack();
+
+    // 猪的普通攻击
+    pigAttack();
+
+    // 猪的技能
+    useSkills();
+
+    // 冷却时间减少
+    if (game.player.cooldown > 0) game.player.cooldown--;
+    for (let skill in game.pig.currentSkillCooldown) {
+        if (game.pig.currentSkillCooldown[skill] > 0) game.pig.currentSkillCooldown[skill]--;
+    }
+
+    // 检查玩家和猪的生命值
+    if (game.player.hp <= 0 || game.pig.hp <= 0) {
+        gameOver();
+        return;
+    }
+
+    // 重绘角色
+    drawStickman();
+    drawPig();
+    drawDamageText();
+
+    // 更新状态栏
+    updateStatusBar();
+
+    requestAnimationFrame(update);
+}
+
+// 事件监听
+window.addEventListener('keydown', (e) => {
+    game.keys[e.key] = true;
+    if (e.key === 'Shift') {
+        game.player.attackType = 'melee'; // 切换到近战模式
+    }
+});
+window.addEventListener('keyup', (e) => {
+    game.keys[e.key] = false;
+    if (e.key === 'Space') {
+        game.player.isAttacking = false;
+    }
+    if (e.key === 'Shift') {
+        game.player.attackType = 'ranged'; // 切换回远程模式
+    }
+});
+
+// 启动游戏
+update();
+</script>
+</body>
+</html>
